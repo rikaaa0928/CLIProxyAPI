@@ -102,7 +102,7 @@ func SignatureProviderFromModelName(modelName string) SignatureProvider {
 // DetectSignatureProviderForBlock, otherwise its signatures would fall through
 // to the residual class. TestSelfDescribingSignatureFirstChars_CoversEveryKnownEnvelope
 // fails when a replay-safe envelope is missing from this set.
-const selfDescribingSignatureFirstChars = "CERg"
+const selfDescribingSignatureFirstChars = "ACERg"
 
 // base64AlphabetSet builds a byte lookup table for the alphanumeric base64 core
 // plus the alphabet-specific characters in extra. Signature charset validation
@@ -216,6 +216,9 @@ func DetectSignatureProviderForBlock(rawSignature string, blockKind SignatureBlo
 		}
 		if IsValidClaudeThinkingSignature(sig, ClaudeSignatureValidationOptions{Strict: true}) {
 			return SignatureProviderClaude
+		}
+		if IsValidKimiThinkingSignature(sig) {
+			return SignatureProviderKimi
 		}
 		if isRecognizedGeminiProviderSignature(sig, blockKind) {
 			return SignatureProviderGemini
@@ -458,7 +461,7 @@ func normalizeCompatibleSignatureForProvider(targetProvider SignatureProvider, r
 }
 
 func isRecognizedGeminiProviderSignature(rawSignature string, blockKind SignatureBlockKind) bool {
-	if IsValidClaudeCAISSignature(rawSignature) {
+	if IsValidClaudeCAISSignature(rawSignature) || IsValidClaudeThinkingSignature(rawSignature, ClaudeSignatureValidationOptions{Strict: true}) {
 		return false
 	}
 	if IsValidGeminiThoughtSignature(rawSignature, GeminiThoughtSignatureValidationOptions{RequireKnownEnvelope: true}) {

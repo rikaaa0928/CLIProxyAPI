@@ -113,7 +113,10 @@ const (
 	// recognized: those models are out of scope, and their signatures now fall
 	// through to the bypass sentinel like any other unknown envelope.
 	GeminiThoughtSignatureEnvelopeProtobufField2 GeminiThoughtSignatureEnvelope = "protobuf_field_2"
-	GeminiThoughtSignatureEnvelopeASCIIUUID      GeminiThoughtSignatureEnvelope = "ascii_uuid"
+	// GeminiThoughtSignatureEnvelopeRawTink is the unwrapped Google Tink
+	// payload emitted by Vertex AI / Gemini endpoints.
+	GeminiThoughtSignatureEnvelopeRawTink   GeminiThoughtSignatureEnvelope = "raw_tink"
+	GeminiThoughtSignatureEnvelopeASCIIUUID GeminiThoughtSignatureEnvelope = "ascii_uuid"
 )
 
 // GeminiThoughtSignatureInfo describes the locally inspectable properties of an
@@ -202,7 +205,7 @@ func InspectGeminiThoughtSignature(rawSignature string, opts ...GeminiThoughtSig
 	info := &GeminiThoughtSignatureInfo{
 		DecodedLen:        len(decoded),
 		FirstByte:         decoded[0],
-		HasObservedMarker: decoded[0] == 0x12,
+		HasObservedMarker: decoded[0] == 0x12 || decoded[0] == 0x01,
 	}
 	info.Envelope, info.KnownEnvelope = classifyGeminiThoughtSignatureEnvelope(decoded)
 	info.RecordCount, info.OpaquePayloadLen = inspectGeminiEnvelope(decoded, info.Envelope)
@@ -441,7 +444,14 @@ func classifyGeminiThoughtSignatureEnvelope(decoded []byte) (GeminiThoughtSignat
 	if isGeminiField2Envelope(decoded) {
 		return GeminiThoughtSignatureEnvelopeProtobufField2, true
 	}
+	if isGeminiRawTinkPayload(decoded) {
+		return GeminiThoughtSignatureEnvelopeRawTink, true
+	}
 	return GeminiThoughtSignatureEnvelopeUnknown, false
+}
+
+func isGeminiRawTinkPayload(decoded []byte) bool {
+	return len(decoded) >= 32 && decoded[0] == 0x01 && len(decoded) != 9709 && len(decoded) != 3255
 }
 
 func isGeminiField2Envelope(decoded []byte) bool {
@@ -450,9 +460,14 @@ func isGeminiField2Envelope(decoded []byte) bool {
 }
 
 func inspectGeminiEnvelope(decoded []byte, envelope GeminiThoughtSignatureEnvelope) (recordCount int, opaquePayloadLen int) {
-	if envelope == GeminiThoughtSignatureEnvelopeProtobufField2 {
+	switch envelope {
+	case GeminiThoughtSignatureEnvelopeProtobufField2:
 		if info, ok := inspectGeminiField2Envelope(decoded); ok {
 			return info.RecordCount, info.OpaquePayloadLen
+		}
+	case GeminiThoughtSignatureEnvelopeRawTink:
+		if isGeminiRawTinkPayload(decoded) {
+			return 1, len(decoded)
 		}
 	}
 	return 0, 0

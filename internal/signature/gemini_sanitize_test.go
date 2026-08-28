@@ -57,6 +57,17 @@ func TestSanitizeGeminiRequestThoughtSignaturesPreservesGeminiSignature(t *testi
 	}
 }
 
+func TestSanitizeGeminiRequestThoughtSignaturesPreservesRawTinkSignature(t *testing.T) {
+	rawTinkSig := "AY89a19mm92EJ1/SrmuUUPGAbqlSJStUcKWpuRB2USL+S1eM3txexyRlPLiik1tGyfZHXkFd4TFRTeNyuitZ88VtTyamp98OFYjYDAy6+a903eQCZcUMAUpV3A5QBWfN5Ka9yMLUbrKbeUhUC6sNQnvSex4Q9H9A40RFLPjPJyq9EDVW8oBsOAkp9ZIyRLlZJ9XcVwMFg0+AQeoW/hghSJvS2eLTACLGGgv1blgs36e11fArrkMsxrTGGRRRq1dazc4xRTailgqTiWVJX1h6KzOZlF651gixr1IeUFfLx0Mcw2W7XFmz8qhDZDKxitQPspy0MA3I6qmAyU37MNOx/SNBCX2dQ7jw+C+L6YhzPiw6Hn4VDf1rqN7vEFTsFipWo07QFAvcIZBzSQztpm+kcQuhMaNaHopcEQ2MrOyAa+BLog=="
+	input := []byte(`{"contents":[{"role":"model","parts":[{"functionCall":{"name":"f","args":{}},"thoughtSignature":"` + rawTinkSig + `"}]}]}`)
+
+	out := SanitizeGeminiRequestThoughtSignatures(input, "contents")
+
+	if got := gjson.GetBytes(out, "contents.0.parts.0.thoughtSignature").String(); got != rawTinkSig {
+		t.Fatalf("thoughtSignature = %q, want %q. Output: %s", got, rawTinkSig, string(out))
+	}
+}
+
 func TestSanitizeGeminiRequestThoughtSignaturesNormalizesDuplicateCanonicalField(t *testing.T) {
 	input := []byte(`{"contents":[{"role":"model","parts":[{"functionCall":{"name":"f","args":{}},"thoughtSignature":"` + GeminiSkipThoughtSignatureValidator + `","thoughtSignature":"bad","thoughtSignature":"worse"}]}]}`)
 
