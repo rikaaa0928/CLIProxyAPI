@@ -1,8 +1,8 @@
 package signature
 
 import (
-	"encoding/base64"
 	"fmt"
+	"github.com/MoeForge/moego/base64"
 	"math"
 	"strings"
 	"unicode/utf8"
@@ -95,7 +95,7 @@ func InspectGrokEncryptedContent(raw string) (*GrokEncryptedContentInfo, error) 
 		if IsValidClaudeCAISSignature(native) {
 			return nil, fmt.Errorf("Grok encrypted_content looks like Claude CAIS thinking signature")
 		}
-		if info, err := InspectGeminiThoughtSignature(native, GeminiThoughtSignatureValidationOptions{RequireKnownEnvelope: true}); err == nil && info.Envelope == GeminiThoughtSignatureEnvelopeProtobufField2 {
+		if _, err := InspectGeminiThoughtSignature(native, GeminiThoughtSignatureValidationOptions{RequireKnownEnvelope: true}); err == nil {
 			return nil, fmt.Errorf("Grok encrypted_content looks like Gemini thoughtSignature")
 		}
 	}
