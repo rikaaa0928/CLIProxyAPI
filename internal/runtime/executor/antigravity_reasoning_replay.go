@@ -568,7 +568,10 @@ func clearAntigravityReasoningReplayOnInvalidSignature(ctx context.Context, scop
 		return nil
 	}
 	bodyText := strings.ToLower(string(body))
-	if !strings.Contains(bodyText, "thoughtsignature") && !strings.Contains(bodyText, "thought_signature") && !strings.Contains(bodyText, "signature") {
+	if !strings.Contains(bodyText, "thoughtsignature") &&
+		!strings.Contains(bodyText, "thought_signature") &&
+		!strings.Contains(bodyText, "signature") &&
+		!strings.Contains(bodyText, "tool call context") {
 		return nil
 	}
 	_, errDelete := internalcache.DeleteAntigravityReasoningReplayItemsIfUnchanged(ctx, scope.modelName, scope.sessionKey, scope.cacheSnapshot)
@@ -2855,6 +2858,17 @@ func (a *antigravityReasoningReplayAccumulator) attachDetachedSignatureToLastFun
 	if a == nil || signature == "" {
 		return false
 	}
+	if internalsignature.IsValidClaudeCAISSignature(internalsignature.SignaturePayloadWithoutProviderPrefix(signature)) {
+		return false
+	}
+	for itemIndex := range a.items {
+		item := util.ParseGJSONBytesNoCopy(a.items[itemIndex])
+		if item.Get("type").String() == "function_call_part" &&
+			int(item.Get("contentIndex").Int()) == a.contentIndex &&
+			strings.TrimSpace(item.Get("thoughtSignature").String()) != "" {
+			return false
+		}
+	}
 	if a.activeStreamingFC != nil {
 		if a.activeStreamingFC.signature != "" {
 			return false
@@ -2871,7 +2885,7 @@ func (a *antigravityReasoningReplayAccumulator) attachDetachedSignatureToLastFun
 		if item.Get("type").String() != "function_call_part" {
 			continue
 		}
-		if strings.TrimSpace(item.Get("thoughtSignature").String()) != "" {
+		if int(item.Get("contentIndex").Int()) != a.contentIndex || strings.TrimSpace(item.Get("thoughtSignature").String()) != "" {
 			return false
 		}
 		updated, errSet := ojson.SetBytes(a.items[itemIndex], "thoughtSignature", signature)

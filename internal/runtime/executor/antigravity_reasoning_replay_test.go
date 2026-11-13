@@ -2303,3 +2303,63 @@ func TestCountTokensReasoningReplayPeeksWithoutReservingTombstone(t *testing.T) 
 		t.Fatalf("GetAntigravityReasoningReplayItems after countTokens peek = %v, ok=%v", got, ok)
 	}
 }
+
+func TestAntigravityReasoningReplayDoesNotBindTrailingServerToolSignatureToParallelSiblingCall(t *testing.T) {
+	internalcache.ClearAntigravityReasoningReplayCache()
+	t.Cleanup(internalcache.ClearAntigravityReasoningReplayCache)
+
+	const (
+		model             = "gemini-4-hydrogen"
+		vertexBareTinkSig = "AY89a18f0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+		trailingToolSig   = "CAISgAIBjz1rX/8lZqtL9Nji7Xohntflh0L8oanqZYBwFfjApyq0exWx/x7zPCLlmLTv8RkIX3eUjLVjRi6m2PkNEAd8wrkD3zIWCYKxWSVEr7dV8RWX7M1ogzzVNwQNO12/Jo6JjAXrq1F5T+P4kQokvKoYYr4B07URYuDYn+OvdTRLh3k1ZROaYd0A3R+Ph6Y3hgcc7rWafbTEd0CgOnS/tvPjXOkpe/5hbp8ORRHERADOZro+ud3iHUMT7pPzjnoh5LiL9tpxFeWFfEyl8E3w8kePwlVQtUF/fCZXKR7EQlDgMFBuVDH80nIeX2aMtq11KxyYrhf59IloB/e6KtpcW73h"
+	)
+	asymOpts := cliproxyexecutor.Options{
+		SourceFormat:   sdktranslator.FormatOpenAIResponse,
+		ResponseFormat: sdktranslator.FormatOpenAIResponse,
+		Headers:        http.Header{"Session-Id": []string{"sess-parallel-tool-context"}},
+	}
+
+	turn1 := []byte(`{"contents":[{"role":"user","parts":[{"text":"Inspect directories in parallel"}]}]}`)
+	doc1 := ojson.NewDoc(turn1)
+	scope1, replayReq1, _, err1 := prepareGeminiTopLevelReasoningReplayPayloadDoc(
+		context.Background(),
+		model,
+		cliproxyexecutor.Request{Model: model, Payload: turn1},
+		asymOpts,
+		doc1,
+	)
+	if err1 != nil || !scope1.valid() {
+		t.Fatalf("prepare turn 1: scope=%+v err=%v", scope1, err1)
+	}
+
+	acc := newAntigravityReasoningReplayAccumulator(scope1, replayReq1)
+	acc.ObserveSSELine([]byte(`data: {"candidates":[{"content":{"role":"model","parts":[{"thought":true,"text":"Checking directories"},{"thoughtSignature":"` + vertexBareTinkSig + `","functionCall":{"id":"call_1","name":"bash","args":{"command":"ls a"}}},{"functionCall":{"id":"call_2","name":"bash","args":{"command":"ls b"}}},{"functionCall":{"id":"call_3","name":"bash","args":{"command":"ls c"}}}]}}]}`))
+	acc.ObserveSSELine([]byte(`data: {"candidates":[{"content":{"role":"model","parts":[{"text":"","thoughtSignature":"` + trailingToolSig + `"}]},"finishReason":"STOP"}]}`))
+	acc.Commit(context.Background())
+
+	turn2 := []byte(`{"contents":[{"role":"user","parts":[{"text":"Inspect directories in parallel"}]},{"role":"model","parts":[{"thought":true,"text":"Checking directories"},{"thoughtSignature":"` + vertexBareTinkSig + `","functionCall":{"name":"bash","args":{"command":"ls a"}}},{"functionCall":{"name":"bash","args":{"command":"ls b"}}},{"functionCall":{"name":"bash","args":{"command":"ls c"}}}]},{"role":"user","parts":[{"functionResponse":{"name":"bash","response":{"result":"ok a"}}},{"functionResponse":{"name":"bash","response":{"result":"ok b"}}},{"functionResponse":{"name":"bash","response":{"result":"ok c"}}}]}]}`)
+	doc2 := ojson.NewDoc(turn2)
+	_, _, changed2, err2 := prepareGeminiTopLevelReasoningReplayPayloadDoc(
+		context.Background(),
+		model,
+		cliproxyexecutor.Request{Model: model, Payload: turn2},
+		asymOpts,
+		doc2,
+	)
+	if err2 != nil {
+		t.Fatalf("prepare turn 2: err=%v", err2)
+	}
+	if changed2 {
+		internalsignature.SanitizeGeminiRequestThoughtSignaturesDoc(doc2, "contents")
+	}
+	if got := doc2.Get("contents.1.parts.1.thoughtSignature").String(); got != vertexBareTinkSig {
+		t.Fatalf("first parallel functionCall signature = %q, want %q", got, vertexBareTinkSig)
+	}
+	if sig := doc2.Get("contents.1.parts.2.thoughtSignature"); sig.Exists() {
+		t.Fatalf("second parallel functionCall should remain unsigned, got %q", sig.String())
+	}
+	if sig := doc2.Get("contents.1.parts.3.thoughtSignature"); sig.Exists() {
+		t.Fatalf("third parallel functionCall should remain unsigned, got %q", sig.String())
+	}
+}
+

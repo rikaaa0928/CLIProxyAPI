@@ -473,10 +473,14 @@ func (e *GeminiVertexExecutor) executeWithServiceAccount(ctx context.Context, au
 	replayScope := antigravityReasoningReplayScope{}
 	var replayRequestPayload []byte
 	if !isImagenModel(baseModel) && antigravityUsesReasoningReplayCache(baseModel) {
+		var changedReplay bool
 		var errReplay error
-		replayScope, replayRequestPayload, _, errReplay = prepareGeminiTopLevelReasoningReplayPayloadDoc(ctx, baseModel, req, opts, doc)
+		replayScope, replayRequestPayload, changedReplay, errReplay = prepareGeminiTopLevelReasoningReplayPayloadDoc(ctx, baseModel, req, opts, doc)
 		if errReplay != nil {
 			return resp, errReplay
+		}
+		if changedReplay {
+			internalsignature.SanitizeGeminiRequestThoughtSignaturesDoc(doc, "contents")
 		}
 	}
 	if !isImagenModel(baseModel) {
@@ -648,10 +652,14 @@ func (e *GeminiVertexExecutor) executeWithAPIKey(ctx context.Context, auth *clip
 	replayScope := antigravityReasoningReplayScope{}
 	var replayRequestPayload []byte
 	if !isImagenModel(baseModel) && antigravityUsesReasoningReplayCache(baseModel) {
+		var changedReplay bool
 		var errReplay error
-		replayScope, replayRequestPayload, _, errReplay = prepareGeminiTopLevelReasoningReplayPayloadDoc(ctx, baseModel, req, opts, doc)
+		replayScope, replayRequestPayload, changedReplay, errReplay = prepareGeminiTopLevelReasoningReplayPayloadDoc(ctx, baseModel, req, opts, doc)
 		if errReplay != nil {
 			return resp, errReplay
+		}
+		if changedReplay {
+			internalsignature.SanitizeGeminiRequestThoughtSignaturesDoc(doc, "contents")
 		}
 	}
 	helps.StripVertexOpenAIResponsesToolCallIDsDoc(doc, from.String())
@@ -803,10 +811,14 @@ func (e *GeminiVertexExecutor) executeStreamWithServiceAccount(ctx context.Conte
 	replayScope := antigravityReasoningReplayScope{}
 	var replayRequestPayload []byte
 	if !isImagenModel(baseModel) && antigravityUsesReasoningReplayCache(baseModel) {
+		var changedReplay bool
 		var errReplay error
-		replayScope, replayRequestPayload, _, errReplay = prepareGeminiTopLevelReasoningReplayPayloadDoc(ctx, baseModel, req, opts, doc)
+		replayScope, replayRequestPayload, changedReplay, errReplay = prepareGeminiTopLevelReasoningReplayPayloadDoc(ctx, baseModel, req, opts, doc)
 		if errReplay != nil {
 			return nil, errReplay
+		}
+		if changedReplay {
+			internalsignature.SanitizeGeminiRequestThoughtSignaturesDoc(doc, "contents")
 		}
 	}
 	helps.StripVertexOpenAIResponsesToolCallIDsDoc(doc, from.String())
@@ -1094,10 +1106,14 @@ func (e *GeminiVertexExecutor) executeStreamWithAPIKey(ctx context.Context, auth
 	replayScope := antigravityReasoningReplayScope{}
 	var replayRequestPayload []byte
 	if !isImagenModel(baseModel) && antigravityUsesReasoningReplayCache(baseModel) {
+		var changedReplay bool
 		var errReplay error
-		replayScope, replayRequestPayload, _, errReplay = prepareGeminiTopLevelReasoningReplayPayloadDoc(ctx, baseModel, req, opts, doc)
+		replayScope, replayRequestPayload, changedReplay, errReplay = prepareGeminiTopLevelReasoningReplayPayloadDoc(ctx, baseModel, req, opts, doc)
 		if errReplay != nil {
 			return nil, errReplay
+		}
+		if changedReplay {
+			internalsignature.SanitizeGeminiRequestThoughtSignaturesDoc(doc, "contents")
 		}
 	}
 	helps.StripVertexOpenAIResponsesToolCallIDsDoc(doc, from.String())
@@ -1374,8 +1390,12 @@ func (e *GeminiVertexExecutor) countTokensWithServiceAccount(ctx context.Context
 	internalsignature.SanitizeGeminiRequestThoughtSignaturesDoc(doc, "contents")
 	helps.EnsureGeminiLeadingUserContentDoc(doc, "contents")
 	if !isImagenModel(baseModel) && antigravityUsesReasoningReplayCache(baseModel) {
-		if _, errReplay := prepareGeminiTopLevelCountTokensReasoningReplayPayloadDoc(ctx, baseModel, req, opts, doc); errReplay != nil {
+		changedReplay, errReplay := prepareGeminiTopLevelCountTokensReasoningReplayPayloadDoc(ctx, baseModel, req, opts, doc)
+		if errReplay != nil {
 			return cliproxyexecutor.Response{}, errReplay
+		}
+		if changedReplay {
+			internalsignature.SanitizeGeminiRequestThoughtSignaturesDoc(doc, "contents")
 		}
 	}
 	helps.StripVertexOpenAIResponsesToolCallIDsDoc(doc, from.String())
@@ -1486,8 +1506,12 @@ func (e *GeminiVertexExecutor) countTokensWithAPIKey(ctx context.Context, auth *
 	internalsignature.SanitizeGeminiRequestThoughtSignaturesDoc(doc, "contents")
 	helps.EnsureGeminiLeadingUserContentDoc(doc, "contents")
 	if !isImagenModel(baseModel) && antigravityUsesReasoningReplayCache(baseModel) {
-		if _, errReplay := prepareGeminiTopLevelCountTokensReasoningReplayPayloadDoc(ctx, baseModel, req, opts, doc); errReplay != nil {
+		changedReplay, errReplay := prepareGeminiTopLevelCountTokensReasoningReplayPayloadDoc(ctx, baseModel, req, opts, doc)
+		if errReplay != nil {
 			return cliproxyexecutor.Response{}, errReplay
+		}
+		if changedReplay {
+			internalsignature.SanitizeGeminiRequestThoughtSignaturesDoc(doc, "contents")
 		}
 	}
 	helps.StripVertexOpenAIResponsesToolCallIDsDoc(doc, from.String())
