@@ -197,6 +197,7 @@ func loadModelsFromBytes(data []byte, source string) error {
 	if err := json.Unmarshal(data, &parsed); err != nil {
 		return fmt.Errorf("%s: decode models catalog: %w", source, err)
 	}
+	ensureGemini4HydrogenXHigh(&parsed)
 	if err := validateModelsCatalog(&parsed); err != nil {
 		return fmt.Errorf("%s: validate models catalog: %w", source, err)
 	}
@@ -205,6 +206,29 @@ func loadModelsFromBytes(data []byte, source string) error {
 	modelsCatalogStore.data = &parsed
 	modelsCatalogStore.mu.Unlock()
 	return nil
+}
+
+func ensureGemini4HydrogenXHigh(data *staticModelsJSON) {
+	if data == nil {
+		return
+	}
+	for _, list := range [][]*ModelInfo{data.Gemini, data.Vertex, data.AIStudio} {
+		for _, m := range list {
+			if m == nil || m.ID != "gemini-4-hydrogen" || m.Thinking == nil {
+				continue
+			}
+			hasXHigh := false
+			for _, lvl := range m.Thinking.Levels {
+				if strings.EqualFold(strings.TrimSpace(lvl), "xhigh") {
+					hasXHigh = true
+					break
+				}
+			}
+			if !hasXHigh {
+				m.Thinking.Levels = append(m.Thinking.Levels, "xhigh")
+			}
+		}
+	}
 }
 
 func getModels() *staticModelsJSON {
