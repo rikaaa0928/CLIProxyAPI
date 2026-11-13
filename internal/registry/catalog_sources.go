@@ -325,6 +325,7 @@ func publishCatalogBytes(data []byte) ([]string, error) {
 	if errUnmarshal := json.Unmarshal(data, &parsed); errUnmarshal != nil {
 		return nil, errUnmarshal
 	}
+	ensureGemini4HydrogenXHigh(&parsed)
 	if errValidate := validateModelsCatalog(&parsed); errValidate != nil {
 		return nil, errValidate
 	}
